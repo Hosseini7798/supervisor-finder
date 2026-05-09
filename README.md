@@ -270,3 +270,25 @@ This tool is for educational and research purposes. Users are responsible for:
 
 **Last Updated:** May 2024  
 **Version:** 0.1.0 (Alpha)
+
+## Authors & Contributors
+
+    @Hosseini7798 - Algorithm Development
+    @nematdar - GUI Development
+
+## Citation
+
+If you use this tool in your research, please cite:
+
+APA:
+Hosseini, A., & Nematdar, M. (2026). Find Your Supervisor (Version 0.1.0) [Computer software]. https://github.com/Hosseini7798/supervisor-finder
+
+BibTeX
+software{supervisor_finder_2026,
+author = {Hosseini, M. and Nematdar, M.},
+title = {Find Your Supervisor},
+year = {2026},
+version = {0.1.0},
+url = {https://github.com/Hosseini7798/supervisor-finder},
+month = {May}
+}
