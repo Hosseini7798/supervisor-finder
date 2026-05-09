@@ -34,6 +34,8 @@ type ResultRow = {
   keywords: string[];
 };
 
+const isDark = ref(false);
+
 const rows = ref<ResultRow[]>([]);
 const searchQuery = ref("");
 const selectedCountries = ref<string[]>([]);
@@ -55,7 +57,17 @@ onMounted(() => {
       console.error("Failed to parse rows from localStorage", e);
     }
   }
+  const savedTheme = localStorage.getItem('supervisor-finder-theme');
+  if (savedTheme === 'dark') {
+    isDark.value = true;
+  }
 });
+
+function toggleTheme() {
+  isDark.value = !isDark.value;
+  const theme = isDark.value ? 'dark' : 'light';
+  localStorage.setItem('supervisor-finder-theme', theme);
+}
 
 const uniqueCountries = computed(() => {
   const countries = new Set<string>();
@@ -142,7 +154,7 @@ const filteredAndSortedRows = computed(() => {
 </script>
 
 <template>
-  <div class="table-window">
+  <div class="table-window" :class="{ dark: isDark }">
     <div v-if="showCountryDropdown || showJournalDropdown" class="dropdown-backdrop" @click="showCountryDropdown = false; showJournalDropdown = false"></div>
 
     <header class="toolbar">
@@ -155,6 +167,10 @@ const filteredAndSortedRows = computed(() => {
       </div>
       
       <div class="filters">
+        <button class="theme-toggle" type="button" @click="toggleTheme" :title="isDark ? 'Switch to light' : 'Switch to dark'">
+          <img :src="isDark ? '/moon.png' : '/sun.png'" :alt="isDark ? 'Dark mode' : 'Light mode'" class="theme-icon" />
+        </button>
+
         <div class="dropdown-container">
           <button @click="showCountryDropdown = !showCountryDropdown; showJournalDropdown = false" class="dropdown-btn">
             Countries ({{ selectedCountries.length }})
@@ -285,13 +301,76 @@ const filteredAndSortedRows = computed(() => {
 
 <style scoped>
 .table-window {
+  --tw-bg: #fdfbf7;
+  --tw-text: #23201d;
+  --tw-toolbar-bg: rgba(255, 255, 255, 0.9);
+  --tw-border: rgba(35, 32, 29, 0.88);
+  --tw-shadow: rgba(35, 32, 29, 0.08);
+  --tw-input-bg: #fff;
+  --tw-chip-bg: #fdfbf7;
+  --tw-table-bg: #fff;
+  --tw-th-bg: #f3efe6;
+  --tw-row-hover: #fcf9f2;
+  --tw-row-border: rgba(35, 32, 29, 0.12);
+  --tw-card-bg: #fdfbf7;
+  --tw-card-border: rgba(35, 32, 29, 0.15);
+  --tw-meta-color: #555;
+  --tw-link-color: #2a6fad;
+  --tw-tag-bg: rgba(35, 32, 29, 0.07);
+  --tw-tag-border: rgba(35, 32, 29, 0.15);
+  --tw-kw-bg: rgba(42, 111, 173, 0.1);
+  --tw-kw-border: rgba(42, 111, 173, 0.25);
+  --tw-muted: #aaa;
+  --tw-sort-bg: #f7c66f;
+  --tw-dropdown-bg: #fff;
+  --tw-dropdown-hover: #fdfbf7;
+  --tw-dropdown-shadow: rgba(35, 32, 29, 0.15);
+  --tw-accent: #f0ae3f;
+  --tw-dashed: rgba(35, 32, 29, 0.2);
+  --tw-detail-color: #444;
+  --tw-noresult-color: #666;
+}
+
+.table-window.dark {
+  --tw-bg: #1a1a2e;
+  --tw-text: #e0e0e0;
+  --tw-toolbar-bg: rgba(26, 26, 46, 0.92);
+  --tw-border: rgba(224, 224, 224, 0.35);
+  --tw-shadow: rgba(0, 0, 0, 0.25);
+  --tw-input-bg: rgba(255, 255, 255, 0.08);
+  --tw-chip-bg: rgba(255, 255, 255, 0.08);
+  --tw-table-bg: rgba(22, 33, 62, 0.95);
+  --tw-th-bg: rgba(15, 52, 96, 0.7);
+  --tw-row-hover: rgba(255, 255, 255, 0.04);
+  --tw-row-border: rgba(224, 224, 224, 0.08);
+  --tw-card-bg: rgba(255, 255, 255, 0.05);
+  --tw-card-border: rgba(224, 224, 224, 0.12);
+  --tw-meta-color: #aaa;
+  --tw-link-color: #7cacf0;
+  --tw-tag-bg: rgba(255, 255, 255, 0.08);
+  --tw-tag-border: rgba(255, 255, 255, 0.15);
+  --tw-kw-bg: rgba(124, 77, 255, 0.15);
+  --tw-kw-border: rgba(124, 77, 255, 0.35);
+  --tw-muted: #666;
+  --tw-sort-bg: #5e35b1;
+  --tw-dropdown-bg: #1a1a2e;
+  --tw-dropdown-hover: rgba(255, 255, 255, 0.05);
+  --tw-dropdown-shadow: rgba(0, 0, 0, 0.4);
+  --tw-accent: #7c4dff;
+  --tw-dashed: rgba(224, 224, 224, 0.15);
+  --tw-detail-color: #aaa;
+  --tw-noresult-color: #888;
+}
+
+.table-window {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   padding: 20px;
-  background: #fdfbf7;
-  color: #23201d;
+  background: var(--tw-bg);
+  color: var(--tw-text);
   font-family: "Comic Sans MS", "Segoe Print", "Bradley Hand", "Trebuchet MS", cursive;
+  transition: background 400ms ease, color 400ms ease;
 }
 
 .toolbar {
@@ -301,22 +380,24 @@ const filteredAndSortedRows = computed(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--tw-toolbar-bg);
   padding: 16px;
   border-radius: 16px;
-  border: 3px solid rgba(35, 32, 29, 0.88);
-  box-shadow: 0 10px 30px rgba(35, 32, 29, 0.08);
+  border: 3px solid var(--tw-border);
+  box-shadow: 0 10px 30px var(--tw-shadow);
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .search-box input, select, button {
   font-family: inherit;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--tw-border);
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 1rem;
-  background: #fff;
+  background: var(--tw-input-bg);
   color: inherit;
   outline: none;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .search-box input {
@@ -324,12 +405,13 @@ const filteredAndSortedRows = computed(() => {
 }
 
 .summary-chip {
-  border: 2px solid rgba(35, 32, 29, 0.88);
+  border: 2px solid var(--tw-border);
   border-radius: 999px;
   padding: 8px 14px;
-  background: #fdfbf7;
+  background: var(--tw-chip-bg);
   font-size: 0.95rem;
   font-weight: bold;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .filters {
@@ -339,7 +421,7 @@ const filteredAndSortedRows = computed(() => {
 }
 
 button.sort-dir-btn {
-  background: #f7c66f;
+  background: var(--tw-sort-bg);
   cursor: pointer;
   transition: transform 100ms;
 }
@@ -349,11 +431,12 @@ button.sort-dir-btn:hover {
 
 .table-wrap {
   flex: 1;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--tw-border);
   border-radius: 20px;
-  background: #fff;
+  background: var(--tw-table-bg);
   overflow: auto;
-  box-shadow: 0 10px 30px rgba(35, 32, 29, 0.08);
+  box-shadow: 0 10px 30px var(--tw-shadow);
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 table {
@@ -367,25 +450,25 @@ th, td {
 }
 
 th {
-  background: #f3efe6;
+  background: var(--tw-th-bg);
   position: sticky;
   top: 0;
-  border-bottom: 3px solid rgba(35, 32, 29, 0.88);
+  border-bottom: 3px solid var(--tw-border);
   font-weight: bold;
 }
 
 tbody tr + tr td {
-  border-top: 1px solid rgba(35, 32, 29, 0.12);
+  border-top: 1px solid var(--tw-row-border);
 }
 
 tbody tr:hover {
-  background: #fcf9f2;
+  background: var(--tw-row-hover);
 }
 
 .no-results {
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--tw-noresult-color);
   font-size: 1.2rem;
 }
 
@@ -393,7 +476,7 @@ tbody tr:hover {
   margin: 5px 0 0 15px;
   padding: 0;
   font-size: 0.9rem;
-  color: #444;
+  color: var(--tw-detail-color);
 }
 
 .detail-list li {
@@ -408,10 +491,11 @@ tbody tr:hover {
 }
 
 .paper-card {
-  background: #fdfbf7;
-  border: 2px solid rgba(35, 32, 29, 0.15);
+  background: var(--tw-card-bg);
+  border: 2px solid var(--tw-card-border);
   border-radius: 10px;
   padding: 10px 12px;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .paper-title {
@@ -424,12 +508,12 @@ tbody tr:hover {
 .paper-meta,
 .paper-ids {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--tw-meta-color);
   margin-bottom: 3px;
 }
 
 .paper-ids a {
-  color: #2a6fad;
+  color: var(--tw-link-color);
   text-decoration: none;
 }
 
@@ -439,17 +523,18 @@ tbody tr:hover {
 
 .meta-sep::before {
   content: " · ";
-  color: #aaa;
+  color: var(--tw-muted);
 }
 
 .tag {
   display: inline-block;
-  background: rgba(35, 32, 29, 0.07);
-  border: 1px solid rgba(35, 32, 29, 0.15);
+  background: var(--tw-tag-bg);
+  border: 1px solid var(--tw-tag-border);
   border-radius: 6px;
   padding: 2px 7px;
   font-size: 0.8rem;
   margin: 2px 3px 2px 0;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .paper-types {
@@ -464,8 +549,8 @@ tbody tr:hover {
 }
 
 .kw-tag {
-  background: rgba(42, 111, 173, 0.1);
-  border-color: rgba(42, 111, 173, 0.25);
+  background: var(--tw-kw-bg);
+  border-color: var(--tw-kw-border);
 }
 
 .mesh-tag {
@@ -477,7 +562,7 @@ tbody tr:hover {
 }
 
 .muted {
-  color: #aaa;
+  color: var(--tw-muted);
 }
 
 .dropdown-backdrop {
@@ -497,31 +582,31 @@ tbody tr:hover {
 
 .dropdown-btn {
   padding: 10px 14px;
-  background: #fff;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  background: var(--tw-input-bg);
+  border: 3px solid var(--tw-border);
   border-radius: 12px;
   cursor: pointer;
   font-family: inherit;
   font-size: 1rem;
-  transition: background-color 150ms;
+  transition: background-color 150ms, border-color 400ms ease;
 }
 
 .dropdown-btn:hover {
-  background: #fdfbf7;
+  background: var(--tw-dropdown-hover);
 }
 
 .dropdown-menu {
   position: absolute;
   top: 110%;
   left: 0;
-  background: #fff;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  background: var(--tw-dropdown-bg);
+  border: 3px solid var(--tw-border);
   border-radius: 12px;
   padding: 12px;
   min-width: 280px;
   max-height: 400px;
   overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(35, 32, 29, 0.15);
+  box-shadow: 0 10px 30px var(--tw-dropdown-shadow);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -539,12 +624,35 @@ tbody tr:hover {
 .dropdown-menu input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: #f0ae3f;
+  accent-color: var(--tw-accent);
 }
 
 .dropdown-menu hr {
   border: none;
-  border-top: 2px dashed rgba(35, 32, 29, 0.2);
+  border-top: 2px dashed var(--tw-dashed);
   margin: 6px 0;
+}
+
+.theme-toggle {
+  min-width: unset;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 3px solid var(--tw-border);
+  background: var(--tw-chip-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 400ms ease, border-color 400ms ease, transform 120ms ease;
+}
+
+.theme-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  transition: transform 500ms ease, opacity 300ms ease;
 }
 </style>

@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+
+const isDark = ref(false);
+const showHelp = ref(false);
+const showSplash = ref(true);
 
 type PaperDetail = {
   title: string;
@@ -44,6 +49,59 @@ const toDate = ref("2024/12/31");
 const isLoading = ref(false);
 
 const rows = ref<ResultRow[]>([]);
+
+onMounted(() => {
+  const saved = localStorage.getItem('supervisor-finder-theme');
+  if (saved === 'dark') {
+    isDark.value = true;
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+  // Hide splash after a short delay
+  setTimeout(() => { showSplash.value = false; }, 1500);
+});
+
+function toggleTheme() {
+  isDark.value = !isDark.value;
+  const theme = isDark.value ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('supervisor-finder-theme', theme);
+}
+
+function toggleHelp() {
+  showHelp.value = !showHelp.value;
+}
+
+async function minimizeWindow() {
+  try {
+    console.log('Minimize clicked');
+    const appWindow = getCurrentWindow();
+    await appWindow.minimize();
+  } catch (err) {
+    console.error('Minimize failed:', err);
+  }
+}
+
+async function maximizeWindow() {
+  try {
+    console.log('Maximize clicked');
+    const appWindow = getCurrentWindow();
+    await appWindow.toggleMaximize();
+  } catch (err) {
+    console.error('Maximize failed:', err);
+  }
+}
+
+async function closeWindow() {
+  try {
+    console.log('Close clicked');
+    const appWindow = getCurrentWindow();
+    console.log('Got window:', appWindow);
+    await appWindow.close();
+    console.log('Close completed');
+  } catch (err) {
+    alert('Close failed: ' + err);
+  }
+}
 
 async function performSearch() {
   if (!query.value) return;
@@ -151,16 +209,101 @@ async function openTableWindow() {
 </script>
 
 <template>
-  <main class="app-shell">
+  <main class="app-shell" :class="{ dark: isDark }">
+    <div v-if="showSplash" class="splash-overlay">
+      <img src="/splash.webp" alt="Loading..." class="splash-image" />
+    </div>
+
     <section class="window-frame">
       <header class="titlebar">
         <h1>Find your Supervisor</h1>
-        <div class="window-controls" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="titlebar-right">
+          <button class="theme-toggle" type="button" @click="toggleTheme" :title="isDark ? 'Switch to light' : 'Switch to dark'">
+            <img :src="isDark ? '/moon.png' : '/sun.png'" :alt="isDark ? 'Dark mode' : 'Light mode'" class="theme-icon" />
+          </button>
+          <button class="help-toggle" type="button" @click="toggleHelp" :title="'PubMed Search Help'">
+            <img :src="isDark ? '/darkq.png' : '/lightq.png'" alt="Help" class="help-icon" />
+          </button>
+          <div class="window-controls">
+            <button class="win-btn minimize" @click="minimizeWindow" title="Minimize">−</button>
+            <button class="win-btn maximize" @click="maximizeWindow" title="Maximize">□</button>
+            <button class="win-btn close" @click="closeWindow" title="Close">×</button>
+          </div>
         </div>
       </header>
+
+      <div v-if="showHelp" class="help-overlay" @click="showHelp = false">
+        <div class="help-popup" @click.stop>
+          <button class="help-close" @click="showHelp = false">×</button>
+          <h2>PubMed Search Guide</h2>
+          
+          <section class="help-section">
+            <h3>Search Field Tags</h3>
+            <ul>
+              <li><code>[tiab]</code> — Title/Abstract (searches both title and abstract text)</li>
+              <li><code>[ti]</code> — Title only</li>
+              <li><code>[au]</code> — Author name</li>
+              <li><code>[ta]</code> — Journal title abbreviation</li>
+              <li><code>[pt]</code> — Publication type (e.g., "review", "clinical trial")</li>
+              <li><code>[pdat]</code> — Publication date (e.g., "2024[pdat]")</li>
+              <li><code>[mesh]</code> — Medical Subject Heading (controlled vocabulary)</li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Boolean Operators</h3>
+            <ul>
+              <li><strong>AND</strong> — Both terms must appear (narrows results)<br/>
+                <em>Example:</em> <code>"machine learning" AND cancer</code></li>
+              <li><strong>OR</strong> — Either term can appear (broadens results)<br/>
+                <em>Example:</em> <code>"deep learning" OR "neural network"</code></li>
+              <li><strong>NOT</strong> — Excludes a term<br/>
+                <em>Example:</em> <code>diabetes NOT "type 1"</code></li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Quotes & Parentheses</h3>
+            <ul>
+              <li><code>"exact phrase"</code> — Searches for the exact phrase in that order</li>
+              <li><code>(...)</code> — Groups terms together to control logic<br/>
+                <em>Example:</em> <code>("AI" OR "artificial intelligence") AND radiology</code></li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Wildcards</h3>
+            <ul>
+              <li><code>*</code> — Matches any group of characters<br/>
+                <em>Example:</em> <code>cardi*</code> finds cardiology, cardiac, cardiovascular</li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Common Patterns</h3>
+            <ul>
+              <li><strong>Topic + recent years:</strong><br/>
+                <code>("deep learning"[tiab]) AND ("2023"[pdat] OR "2024"[pdat])</code></li>
+              <li><strong>Multiple synonyms:</strong><br/>
+                <code>("AI"[tiab] OR "artificial intelligence"[tiab] OR "machine learning"[tiab])</code></li>
+              <li><strong>Exclude reviews:</strong><br/>
+                <code>cancer[tiab] NOT "review"[pt]</code></li>
+              <li><strong>Specific journal:</strong><br/>
+                <code>"Nature"[ta] AND genomics[tiab]</code></li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Tips</h3>
+            <ul>
+              <li>Use <strong>OR</strong> for synonyms to capture more results</li>
+              <li>Use <strong>AND</strong> to combine different concepts</li>
+              <li>Use <code>[tiab]</code> for broad topic searches</li>
+              <li>Combine field tags with Boolean operators for precision</li>
+            </ul>
+          </section>
+        </div>
+      </div>
 
       <section class="panel panel-input">
         <div class="panel-label">Input</div>
@@ -205,25 +348,71 @@ async function openTableWindow() {
 
 <style scoped>
 .app-shell {
+  --bg-main: linear-gradient(135deg, #f8f2ea 0%, #f3efe6 45%, #e7ece8 100%);
+  --bg-radial-a: rgba(247, 204, 146, 0.65);
+  --bg-radial-b: rgba(168, 208, 216, 0.7);
+  --color-text: #23201d;
+  --frame-bg: rgba(255, 251, 246, 0.82);
+  --frame-border: rgba(35, 32, 29, 0.88);
+  --frame-shadow: rgba(35, 32, 29, 0.16);
+  --input-bg: rgba(255, 255, 255, 0.88);
+  --chip-bg: rgba(255, 255, 255, 0.8);
+  --csv-bg: rgba(255, 255, 255, 0.78);
+  --btn-bg: rgba(255, 255, 255, 0.88);
+  --btn-shadow: rgba(35, 32, 29, 0.1);
+  --btn-primary-from: #f7c66f;
+  --btn-primary-to: #f0ae3f;
+  --btn-secondary-bg: rgba(255, 255, 255, 0.82);
+  --border-dashed: rgba(35, 32, 29, 0.22);
+  --row-border: rgba(35, 32, 29, 0.12);
+  --th-border: rgba(35, 32, 29, 0.85);
+}
+
+.app-shell.dark {
+  --bg-main: linear-gradient(135deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  --bg-radial-a: rgba(94, 53, 177, 0.4);
+  --bg-radial-b: rgba(30, 136, 229, 0.3);
+  --color-text: #e0e0e0;
+  --frame-bg: rgba(26, 26, 46, 0.9);
+  --frame-border: rgba(224, 224, 224, 0.35);
+  --frame-shadow: rgba(0, 0, 0, 0.4);
+  --input-bg: rgba(255, 255, 255, 0.08);
+  --chip-bg: rgba(255, 255, 255, 0.08);
+  --csv-bg: rgba(255, 255, 255, 0.06);
+  --btn-bg: rgba(255, 255, 255, 0.1);
+  --btn-shadow: rgba(0, 0, 0, 0.25);
+  --btn-primary-from: #5e35b1;
+  --btn-primary-to: #7c4dff;
+  --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --border-dashed: rgba(224, 224, 224, 0.15);
+  --row-border: rgba(224, 224, 224, 0.08);
+  --th-border: rgba(224, 224, 224, 0.3);
+}
+
+.app-shell {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at top left, rgba(247, 204, 146, 0.65), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(168, 208, 216, 0.7), transparent 28%),
-    linear-gradient(135deg, #f8f2ea 0%, #f3efe6 45%, #e7ece8 100%);
-  color: #23201d;
+    radial-gradient(circle at top left, var(--bg-radial-a), transparent 30%),
+    radial-gradient(circle at bottom right, var(--bg-radial-b), transparent 28%),
+    var(--bg-main);
+  color: var(--color-text);
+  transition: background 400ms ease, color 400ms ease;
+  overflow: hidden;
+  border-radius: 34px;
 }
 
 .window-frame {
   width: min(760px, 100%);
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--frame-border);
   border-radius: 34px;
   padding: 18px 18px 20px;
-  background: rgba(255, 251, 246, 0.82);
-  box-shadow: 0 30px 60px rgba(35, 32, 29, 0.16);
+  background: var(--frame-bg);
+  box-shadow: 0 30px 60px var(--frame-shadow);
   backdrop-filter: blur(8px);
+  transition: background 400ms ease, border-color 400ms ease, box-shadow 400ms ease;
 }
 
 .titlebar {
@@ -232,6 +421,18 @@ async function openTableWindow() {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 18px;
+  -webkit-app-region: drag;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar h1 {
+  -webkit-app-region: drag;
 }
 
 .titlebar h1,
@@ -254,14 +455,51 @@ table {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  z-index: 100;
+  -webkit-app-region: no-drag;
 }
 
-.window-controls span {
-  display: block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+.win-btn {
+  min-width: unset;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 3px solid var(--frame-border);
   border-radius: 999px;
+  background: var(--chip-bg);
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 200ms ease, transform 120ms ease, border-color 400ms ease;
+  box-shadow: none;
+  position: relative;
+  z-index: 101;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn:hover {
+  transform: scale(1.05);
+}
+
+.win-btn:active {
+  transform: scale(0.95);
+}
+
+.win-btn.minimize:hover {
+  background: var(--btn-primary-from);
+}
+
+.win-btn.maximize:hover {
+  background: var(--btn-primary-from);
+}
+
+.win-btn.close:hover {
+  background: #ff5252;
+  border-color: #d32f2f;
 }
 
 .panel {
@@ -286,13 +524,14 @@ table {
 .field input {
   box-sizing: border-box;
   width: 90%;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--frame-border);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--input-bg);
   padding: 16px 18px;
   font-size: 1.1rem;
   color: inherit;
   outline: none;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .range-row {
@@ -312,7 +551,7 @@ table {
 }
 
 .panel-output {
-  border-top: 1px dashed rgba(35, 32, 29, 0.22);
+  border-top: 1px dashed var(--border-dashed);
   padding-top: 18px;
 }
 
@@ -332,20 +571,22 @@ table {
 }
 
 .summary-chip {
-  border: 2px solid rgba(35, 32, 29, 0.88);
+  border: 2px solid var(--frame-border);
   border-radius: 999px;
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--chip-bg);
   font-size: 0.95rem;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .table-wrap,
 .csv-box {
   min-height: 220px;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--frame-border);
   border-radius: 30px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--csv-bg);
   overflow: hidden;
+  transition: background 400ms ease, border-color 400ms ease;
 }
 
 .table-wrap {
@@ -366,11 +607,11 @@ td {
 }
 
 th {
-  border-bottom: 2px solid rgba(35, 32, 29, 0.85);
+  border-bottom: 2px solid var(--th-border);
 }
 
 tbody tr + tr td {
-  border-top: 1px solid rgba(35, 32, 29, 0.12);
+  border-top: 1px solid var(--row-border);
 }
 
 .csv-box {
@@ -391,18 +632,19 @@ tbody tr + tr td {
 
 button {
   min-width: 148px;
-  border: 3px solid rgba(35, 32, 29, 0.88);
+  border: 3px solid var(--frame-border);
   border-radius: 20px;
   padding: 14px 18px;
   font-size: 1.05rem;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--btn-bg);
   color: inherit;
   cursor: pointer;
   transition:
     transform 120ms ease,
     box-shadow 120ms ease,
-    background-color 120ms ease;
-  box-shadow: 0 8px 0 rgba(35, 32, 29, 0.1);
+    background-color 120ms ease,
+    border-color 400ms ease;
+  box-shadow: 0 8px 0 var(--btn-shadow);
 }
 
 button:hover {
@@ -411,15 +653,15 @@ button:hover {
 
 button:active {
   transform: translateY(2px);
-  box-shadow: 0 4px 0 rgba(35, 32, 29, 0.12);
+  box-shadow: 0 4px 0 var(--btn-shadow);
 }
 
 .primary {
-  background: linear-gradient(180deg, #f7c66f 0%, #f0ae3f 100%);
+  background: linear-gradient(180deg, var(--btn-primary-from) 0%, var(--btn-primary-to) 100%);
 }
 
 .secondary {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--btn-secondary-bg);
 }
 
 @media (max-width: 720px) {
@@ -441,5 +683,183 @@ button:active {
   button {
     width: 100%;
   }
+}
+
+.theme-toggle {
+  min-width: unset;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 3px solid var(--frame-border);
+  background: var(--chip-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  transition: background 400ms ease, border-color 400ms ease, transform 120ms ease;
+}
+
+.theme-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  transition: transform 500ms ease, opacity 300ms ease;
+}
+
+.help-toggle {
+  min-width: unset;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 3px solid var(--frame-border);
+  background: var(--chip-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  transition: background 400ms ease, border-color 400ms ease, transform 120ms ease;
+}
+
+.help-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.help-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 200ms ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-popup {
+  position: relative;
+  width: min(680px, 90vw);
+  max-height: 85vh;
+  background: var(--frame-bg);
+  border: 3px solid var(--frame-border);
+  border-radius: 24px;
+  padding: 28px 32px;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px var(--frame-shadow);
+  animation: slideUp 300ms ease;
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.help-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--frame-border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 120ms ease, background 400ms ease;
+}
+
+.help-close:hover {
+  transform: scale(1.1);
+}
+
+.help-popup h2 {
+  margin: 0 0 20px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.help-section {
+  margin-bottom: 20px;
+}
+
+.help-section h3 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--btn-primary-to);
+}
+
+.help-section ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+
+.help-section li {
+  margin-bottom: 8px;
+}
+
+.help-section code {
+  background: var(--csv-bg);
+  border: 1px solid var(--frame-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-family: "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+.help-section em {
+  color: var(--meta-color, #666);
+  font-style: italic;
+}
+
+.splash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--frame-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeOut 500ms ease 1s forwards;
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.splash-image {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
 }
 </style>
