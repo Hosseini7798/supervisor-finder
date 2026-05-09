@@ -48,7 +48,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
-
+scratch_test.py
 # Translations
 *.mo
 *.pot
@@ -142,3 +142,9 @@ result.txt
 # Project-specific
 data/
 /notebooks/working/
+node_modules/
+
+# Copilot memory and local agent guidance
+memory-bank/
+memorybank/
+.github/copilot-instructions.md
