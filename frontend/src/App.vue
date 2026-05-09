@@ -7,6 +7,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 const isDark = ref(false);
 const showHelp = ref(false);
+const showAbout = ref(false);
 const showSplash = ref(true);
 
 type PaperDetail = {
@@ -69,6 +70,10 @@ function toggleTheme() {
 
 function toggleHelp() {
   showHelp.value = !showHelp.value;
+}
+
+function toggleAbout() {
+  showAbout.value = !showAbout.value;
 }
 
 async function minimizeWindow() {
@@ -224,6 +229,9 @@ async function openTableWindow() {
           <button class="help-toggle" type="button" @click="toggleHelp" :title="'PubMed Search Help'">
             <img :src="isDark ? '/darkq.png' : '/lightq.png'" alt="Help" class="help-icon" />
           </button>
+          <button class="about-toggle" type="button" @click="toggleAbout" :title="'About Us'">
+            <img :src="isDark ? '/aboutusdark.png' : '/aboutuslight.png'" alt="About" class="about-icon" />
+          </button>
           <div class="window-controls">
             <button class="win-btn minimize" @click="minimizeWindow" title="Minimize">−</button>
             <button class="win-btn maximize" @click="maximizeWindow" title="Maximize">□</button>
@@ -301,6 +309,70 @@ async function openTableWindow() {
               <li>Use <code>[tiab]</code> for broad topic searches</li>
               <li>Combine field tags with Boolean operators for precision</li>
             </ul>
+          </section>
+        </div>
+      </div>
+
+      <div v-if="showAbout" class="help-overlay" @click="showAbout = false">
+        <div class="help-popup" @click.stop>
+          <button class="help-close" @click="showAbout = false">×</button>
+          <h2>About Us</h2>
+          
+          <section class="help-section">
+            <h3>Mission</h3>
+            <p>Find Your Supervisor is an open-source desktop application designed to help graduate and undergraduate students discover potential academic supervisors by analyzing published research articles from PubMed. Our goal is to simplify the supervisor search process by providing data-driven insights into active researchers in your field of interest.</p>
+          </section>
+
+          <section class="help-section">
+            <h3>What It Does</h3>
+            <p>The application uses an intelligent algorithm to:</p>
+            <ul>
+              <li>Search PubMed publications in your research domain using recursive date-range splitting to handle large datasets (>10,000 articles)</li>
+              <li>Extract comprehensive author information including affiliations, emails, journal details, and publication metrics</li>
+              <li>Filter by geography to identify researchers in your target countries or regions</li>
+              <li>Assess journal quality by merging results with SCImago rankings to prioritize high-impact publications</li>
+              <li>Unify author profiles by aggregating information across multiple papers</li>
+              <li>Extract contact information through automated DOI lookup for corresponding authors</li>
+              <li>Process data efficiently using parallel multi-threaded fetching</li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Development Team</h3>
+            <ul>
+              <li><strong>M. Hosseini</strong> – Algorithm Development & Backend Logic</li>
+              <li><strong>M. Nematdar</strong> – GUI Development & Frontend Design</li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Project Status</h3>
+            <p>This is an alpha release (v0.1.0), meaning the application is in early development. We welcome feedback, bug reports, and feature suggestions as we continue to improve the tool.</p>
+          </section>
+
+          <section class="help-section">
+            <h3>Technical Details</h3>
+            <ul>
+              <li><strong>License:</strong> MIT License</li>
+              <li><strong>Version:</strong> 0.1.0 (Alpha)</li>
+              <li><strong>Repository:</strong> <a href="https://github.com/hosseini7798/supervisor-finder" target="_blank">github.com/hosseini7798/supervisor-finder</a></li>
+              <li><strong>Backend:</strong> Python with FastAPI</li>
+              <li><strong>Frontend:</strong> Vue 3 + TypeScript</li>
+              <li><strong>Framework:</strong> Tauri</li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Contact</h3>
+            <ul>
+              <li><strong>M. Hosseini:</strong> <a href="mailto:hosseini7798@gmail.com">hosseini7798@gmail.com</a></li>
+              <li><strong>M. Nematdar:</strong> <a href="mailto:nematdar.m@gmail.com">nematdar.m@gmail.com</a></li>
+            </ul>
+          </section>
+
+          <section class="help-section">
+            <h3>Disclaimer</h3>
+            <p>This tool is provided for research and educational purposes. Users are responsible for verifying all information and complying with PubMed's terms of service and applicable data protection regulations when contacting researchers.</p>
           </section>
         </div>
       </div>
@@ -728,6 +800,27 @@ button:active {
   object-fit: contain;
 }
 
+.about-toggle {
+  min-width: unset;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 3px solid var(--frame-border);
+  background: var(--chip-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  transition: background 400ms ease, border-color 400ms ease, transform 120ms ease;
+}
+
+.about-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
 .help-overlay {
   position: fixed;
   top: 0;
@@ -834,6 +927,21 @@ button:active {
 .help-section em {
   color: var(--meta-color, #666);
   font-style: italic;
+}
+
+.help-section p {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.help-section a {
+  color: var(--btn-primary-to);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.help-section a:hover {
+  text-decoration: underline;
 }
 
 .splash-overlay {
