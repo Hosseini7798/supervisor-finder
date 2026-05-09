@@ -4,6 +4,26 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
+type PaperDetail = {
+  title: string;
+  pmid: string;
+  doi: string | null;
+  pmc_id: string | null;
+  journal_title: string;
+  journal_iso: string;
+  journal_volume: string;
+  journal_issue: string;
+  pub_year: string;
+  pub_month: string;
+  pub_day: string;
+  medline_pgn: string;
+  language: string;
+  publication_status: string;
+  publication_types: string[];
+  mesh_headings: { descriptor: string; descriptor_ui: string; qualifier: string; qualifier_ui: string }[];
+  grants: { grant_id: string; agency: string; country: string }[];
+};
+
 type ResultRow = {
   author: string;
   institution: string;
@@ -12,7 +32,9 @@ type ResultRow = {
   score: string;
   num_papers: number;
   papers: string[];
+  paper_details: PaperDetail[];
   journals: string[];
+  keywords: string[];
 };
 
 const query = ref('("deep learning"[tiab] OR "machine learning"[tiab]) AND ("medical imaging"[tiab])');
@@ -53,7 +75,7 @@ async function performSearch() {
 }
 
 const csvPreview = computed(() => {
-  const header = ["author", "institution", "country", "email", "score", "num_papers", "papers", "journals"].join(",");
+  const header = ["author", "institution", "country", "email", "score", "num_papers", "papers", "journals", "keywords"].join(",");
   const lines = rows.value.map((row) =>
     [
       row.author, 
@@ -63,7 +85,8 @@ const csvPreview = computed(() => {
       row.score, 
       row.num_papers, 
       (row.papers || []).join(" | "), 
-      (row.journals || []).join(" | ")
+      (row.journals || []).join(" | "),
+      (row.keywords || []).join(" | ")
     ]
       .map((value) => `"${String(value).replace(/"/g, '""')}"`)
       .join(","),

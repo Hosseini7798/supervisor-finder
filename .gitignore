@@ -49,6 +49,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 scratch_test.py
+test_columns.py
 # Translations
 *.mo
 *.pot

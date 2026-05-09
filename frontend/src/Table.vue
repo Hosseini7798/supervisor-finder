@@ -1,6 +1,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 
+type PaperDetail = {
+  title: string;
+  pmid: string;
+  doi: string | null;
+  pmc_id: string | null;
+  journal_title: string;
+  journal_iso: string;
+  journal_volume: string;
+  journal_issue: string;
+  pub_year: string;
+  pub_month: string;
+  pub_day: string;
+  medline_pgn: string;
+  language: string;
+  publication_status: string;
+  publication_types: string[];
+  mesh_headings: { descriptor: string; descriptor_ui: string; qualifier: string; qualifier_ui: string }[];
+  grants: { grant_id: string; agency: string; country: string }[];
+};
+
 type ResultRow = {
   author: string;
   institution: string;
@@ -9,7 +29,9 @@ type ResultRow = {
   score: string;
   num_papers: number;
   papers: string[];
+  paper_details: PaperDetail[];
   journals: string[];
+  keywords: string[];
 };
 
 const rows = ref<ResultRow[]>([]);
@@ -184,8 +206,9 @@ const filteredAndSortedRows = computed(() => {
             <th>Institution</th>
             <th>Country</th>
             <th>Email</th>
-            <th>Papers (Count)</th>
+            <th>Papers</th>
             <th>Journals</th>
+            <th>Keywords</th>
             <th>Score</th>
           </tr>
         </thead>
@@ -196,11 +219,40 @@ const filteredAndSortedRows = computed(() => {
             <td>{{ row.country }}</td>
             <td>{{ row.email }}</td>
             <td>
-              <details v-if="row.papers && row.papers.length > 0">
+              <details v-if="row.paper_details && row.paper_details.length > 0">
                 <summary>{{ row.num_papers }} Papers</summary>
-                <ul class="detail-list">
-                  <li v-for="paper in row.papers" :key="paper">{{ paper }}</li>
-                </ul>
+                <div class="paper-cards">
+                  <div v-for="(pd, idx) in row.paper_details" :key="pd.pmid || idx" class="paper-card">
+                    <p class="paper-title">{{ pd.title }}</p>
+                    <div class="paper-meta">
+                      <span v-if="pd.pub_year">{{ pd.pub_year }}<template v-if="pd.pub_month"> {{ pd.pub_month }}</template></span>
+                      <span v-if="pd.journal_title" class="meta-sep">{{ pd.journal_title }}</span>
+                      <span v-if="pd.journal_volume" class="meta-sep">Vol. {{ pd.journal_volume }}<template v-if="pd.journal_issue">({{ pd.journal_issue }})</template></span>
+                      <span v-if="pd.medline_pgn" class="meta-sep">pp. {{ pd.medline_pgn }}</span>
+                      <span v-if="pd.language && pd.language !== 'eng'" class="meta-sep">{{ pd.language }}</span>
+                    </div>
+                    <div class="paper-ids">
+                      <span v-if="pd.pmid">PMID: {{ pd.pmid }}</span>
+                      <a v-if="pd.doi" :href="'https://doi.org/' + pd.doi" target="_blank" rel="noopener" class="meta-sep">DOI: {{ pd.doi }}</a>
+                      <span v-if="pd.pmc_id" class="meta-sep">PMC: {{ pd.pmc_id }}</span>
+                    </div>
+                    <div v-if="pd.publication_types && pd.publication_types.length" class="paper-types">
+                      <span v-for="pt in pd.publication_types" :key="pt" class="tag">{{ pt }}</span>
+                    </div>
+                    <details v-if="pd.mesh_headings && pd.mesh_headings.length" class="nested-details">
+                      <summary>MeSH ({{ pd.mesh_headings.length }})</summary>
+                      <div class="mesh-tags">
+                        <span v-for="mh in pd.mesh_headings" :key="mh.descriptor_ui || mh.descriptor" class="tag mesh-tag">{{ mh.descriptor }}<template v-if="mh.qualifier"> / {{ mh.qualifier }}</template></span>
+                      </div>
+                    </details>
+                    <details v-if="pd.grants && pd.grants.length" class="nested-details">
+                      <summary>Grants ({{ pd.grants.length }})</summary>
+                      <ul class="detail-list">
+                        <li v-for="g in pd.grants" :key="g.grant_id || g.agency">{{ g.agency }}<template v-if="g.grant_id"> ({{ g.grant_id }})</template><template v-if="g.country"> — {{ g.country }}</template></li>
+                      </ul>
+                    </details>
+                  </div>
+                </div>
               </details>
               <span v-else>{{ row.num_papers }}</span>
             </td>
@@ -211,6 +263,14 @@ const filteredAndSortedRows = computed(() => {
                   <li v-for="journal in row.journals" :key="journal">{{ journal }}</li>
                 </ul>
               </details>
+            </td>
+            <td>
+              <template v-if="row.keywords && row.keywords.length > 0">
+                <div class="keyword-tags">
+                  <span v-for="kw in row.keywords" :key="kw" class="tag kw-tag">{{ kw }}</span>
+                </div>
+              </template>
+              <span v-else class="muted">—</span>
             </td>
             <td>{{ row.score }}</td>
           </tr>
@@ -338,6 +398,86 @@ tbody tr:hover {
 
 .detail-list li {
   margin-bottom: 4px;
+}
+
+.paper-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.paper-card {
+  background: #fdfbf7;
+  border: 2px solid rgba(35, 32, 29, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.paper-title {
+  margin: 0 0 4px;
+  font-weight: bold;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.paper-meta,
+.paper-ids {
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 3px;
+}
+
+.paper-ids a {
+  color: #2a6fad;
+  text-decoration: none;
+}
+
+.paper-ids a:hover {
+  text-decoration: underline;
+}
+
+.meta-sep::before {
+  content: " · ";
+  color: #aaa;
+}
+
+.tag {
+  display: inline-block;
+  background: rgba(35, 32, 29, 0.07);
+  border: 1px solid rgba(35, 32, 29, 0.15);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.8rem;
+  margin: 2px 3px 2px 0;
+}
+
+.paper-types {
+  margin-top: 4px;
+}
+
+.mesh-tags,
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.kw-tag {
+  background: rgba(42, 111, 173, 0.1);
+  border-color: rgba(42, 111, 173, 0.25);
+}
+
+.mesh-tag {
+  font-size: 0.78rem;
+}
+
+.nested-details {
+  margin-top: 5px;
+}
+
+.muted {
+  color: #aaa;
 }
 
 .dropdown-backdrop {
