@@ -79,7 +79,7 @@ def search_pubmed(query, mindate="2024/01/01", maxdate="2030/01/01"):
 
         # If results < 10,000 or range is <= 1 day, return results
         if len(ids) < 9999 or days <= 1:
-            print(f"  ✓ {start_str} → {end_str}: {len(ids)} papers")
+            print(f"  [OK] {start_str} -> {end_str}: {len(ids)} papers")
             return ids
 
         # Results exceed limit, split the period in half
@@ -87,7 +87,7 @@ def search_pubmed(query, mindate="2024/01/01", maxdate="2030/01/01"):
         mid_str = mid_dt.strftime("%Y/%m/%d")
 
         print(
-            f"  ⚠ {start_str} → {end_str}: {len(ids)} papers (exceeds limit, splitting...)"
+            f"  [WARN] {start_str} -> {end_str}: {len(ids)} papers (exceeds limit, splitting...)"
         )
 
         # Recursively search both halves
@@ -102,7 +102,7 @@ def search_pubmed(query, mindate="2024/01/01", maxdate="2030/01/01"):
 
     # Remove duplicates while preserving order
     unique_ids = list(dict.fromkeys(all_ids))
-    print(f"\n✓ Total unique PMIDs found: {len(unique_ids)}")
+    print(f"\n[OK] Total unique PMIDs found: {len(unique_ids)}")
     return unique_ids
 
 
@@ -157,11 +157,11 @@ def fetch_details(pmids, max_workers=None, delay=None, max_retries=None):
             return chunk_papers.get("PubmedArticle", [])
         except Exception as e:
             if attempt < max_retries:
-                print(f"  ⚠ Retry {attempt + 1}/{max_retries} for chunk")
+                print(f"  [WARN] Retry {attempt + 1}/{max_retries} for chunk")
                 time.sleep(delay * (attempt + 2))  # Exponential backoff
                 return fetch_chunk(chunk_ids, attempt + 1)
             else:
-                print(f"  ✗ Failed after {max_retries} retries")
+                print(f"  [ERROR] Failed after {max_retries} retries")
                 return []
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -170,11 +170,12 @@ def fetch_details(pmids, max_workers=None, delay=None, max_retries=None):
                 executor.map(lambda c: fetch_chunk(c, 0), chunks),
                 desc="Fetching papers",
                 total=len(chunks),
+                ascii=True,
             )
         )
 
     for result in results:
         papers.extend(result)
 
-    print(f"✓ Retrieved {len(papers)} papers from {len(pmids)} PMIDs")
+    print(f"[OK] Retrieved {len(papers)} papers from {len(pmids)} PMIDs")
     return papers

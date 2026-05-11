@@ -2,15 +2,31 @@ import pandas as pd
 from typing import Dict, Any
 import re
 import logging
+import sys
+from pathlib import Path
 
-from pubmed_supervisor import (
-    search_pubmed,
-    fetch_details,
-    extract_info,
-    extract_country,
-    unify_authors,
-    merge_with_scimago
-)
+# Allow running API from repository root without requiring `pip install -e .`.
+try:
+    from pubmed_supervisor import (
+        search_pubmed,
+        fetch_details,
+        extract_info,
+        extract_country,
+        unify_authors,
+        merge_with_scimago,
+    )
+except ModuleNotFoundError:
+    repo_src = Path(__file__).resolve().parents[1] / "src"
+    if str(repo_src) not in sys.path:
+        sys.path.insert(0, str(repo_src))
+    from pubmed_supervisor import (
+        search_pubmed,
+        fetch_details,
+        extract_info,
+        extract_country,
+        unify_authors,
+        merge_with_scimago,
+    )
 from .schemas import ResultRow, PaperDetail
 
 logger = logging.getLogger(__name__)

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
 
 const isDark = ref(false);
 const showHelp = ref(false);
@@ -44,12 +45,21 @@ type ResultRow = {
 };
 
 const query = ref('("deep learning"[tiab] OR "machine learning"[tiab]) AND ("medical imaging"[tiab])');
-const fromDate = ref("2023/01/01");
-const toDate = ref("2024/12/31");
+const fromDate = ref("2025/01/01");
+const toDate = ref(new Date().toISOString().split('T')[0]); // today's date as default
 
 const isLoading = ref(false);
+const searchError = ref("");
+const backendConnected = ref(false);
+const backendStatusChecking = ref(true);
+let backendHealthTimer: number | undefined;
 
 const rows = ref<ResultRow[]>([]);
+
+const backendStatusText = computed(() => {
+  if (backendStatusChecking.value) return 'Checking backend';
+  return backendConnected.value ? 'Backend connected' : 'Backend disconnected';
+});
 
 onMounted(() => {
   const saved = localStorage.getItem('supervisor-finder-theme');
@@ -59,7 +69,58 @@ onMounted(() => {
   }
   // Hide splash after a short delay
   setTimeout(() => { showSplash.value = false; }, 1500);
+
+  void initializeBackendMonitoring();
 });
+
+onBeforeUnmount(() => {
+  if (backendHealthTimer) {
+    window.clearInterval(backendHealthTimer);
+    backendHealthTimer = undefined;
+  }
+});
+
+async function checkBackendHealth() {
+  backendStatusChecking.value = true;
+  try {
+    const response = await fetch("http://localhost:8000/health", {
+      method: "GET",
+      cache: "no-store"
+    });
+    backendConnected.value = response.ok;
+  } catch {
+    backendConnected.value = false;
+  } finally {
+    backendStatusChecking.value = false;
+  }
+
+  return backendConnected.value;
+}
+
+async function startBackendProcess() {
+  try {
+    await invoke<boolean>("start_backend");
+  } catch (error) {
+    console.warn("Failed to start backend from Tauri:", error);
+  }
+}
+
+async function initializeBackendMonitoring() {
+  await startBackendProcess();
+  await checkBackendHealth();
+
+  backendHealthTimer = window.setInterval(() => {
+    void checkBackendHealth();
+  }, 5000);
+}
+
+async function retryBackendConnection() {
+  await startBackendProcess();
+  const ok = await checkBackendHealth();
+  if (ok) {
+    searchError.value = "";
+  }
+}
 
 function toggleTheme() {
   isDark.value = !isDark.value;
@@ -110,8 +171,20 @@ async function closeWindow() {
 
 async function performSearch() {
   if (!query.value) return;
+
+  const isHealthy = await checkBackendHealth();
+  if (!isHealthy) {
+    await startBackendProcess();
+    const isHealthyAfterStart = await checkBackendHealth();
+    if (!isHealthyAfterStart) {
+      rows.value = [];
+      searchError.value = "Cannot connect to backend API at http://localhost:8000. Backend auto-start failed. Ensure Python dependencies are installed, then retry.";
+      return;
+    }
+  }
   
   isLoading.value = true;
+  searchError.value = "";
   try {
     const response = await fetch("http://localhost:8000/search", {
       method: "POST",
@@ -124,13 +197,23 @@ async function performSearch() {
     });
     
     if (!response.ok) {
+      rows.value = [];
+      searchError.value = `Search request failed (${response.status}). Make sure the backend API is running on http://localhost:8000.`;
       console.error("Search failed", response.status);
       return;
     }
     
     const data = await response.json();
+    if (data?.metadata?.error) {
+      searchError.value = `Search failed: ${data.metadata.error}`;
+    }
+    if ((data?.metadata?.status === "no_results" || (data?.candidates || []).length === 0) && !searchError.value) {
+      searchError.value = "No results found for this query/date range.";
+    }
     rows.value = data.candidates || [];
   } catch (error) {
+    rows.value = [];
+    searchError.value = "Cannot connect to backend API at http://localhost:8000. Start the FastAPI server and try again.";
     console.error("Error during search:", error);
   } finally {
     isLoading.value = false;
@@ -404,8 +487,23 @@ async function openTableWindow() {
             <p class="panel-label">Output</p>
             <h2>output in csv format</h2>
           </div>
-          <div class="summary-chip">{{ rows.length }} candidates</div>
+          <div class="panel-status">
+            <div class="summary-chip">{{ rows.length }} candidates</div>
+            <button
+              class="backend-badge"
+              type="button"
+              @click="retryBackendConnection"
+              :class="{ online: backendConnected && !backendStatusChecking, offline: !backendConnected && !backendStatusChecking }"
+              :disabled="backendStatusChecking"
+              title="Retry backend connection"
+            >
+              <span class="dot" />
+              {{ backendStatusText }}
+            </button>
+          </div>
         </div>
+
+        <p v-if="searchError" class="search-error">{{ searchError }}</p>
 
         <pre class="csv-box">{{ csvPreview }}</pre>
       </section>
@@ -622,6 +720,22 @@ table {
   font-weight: 700;
 }
 
+.search-error {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid rgba(180, 40, 40, 0.45);
+  background: rgba(255, 80, 80, 0.1);
+  color: #9a1f1f;
+  font-size: 0.95rem;
+}
+
+.app-shell.dark .search-error {
+  border-color: rgba(255, 120, 120, 0.4);
+  background: rgba(255, 120, 120, 0.12);
+  color: #ffb4b4;
+}
+
 .panel-output {
   border-top: 1px dashed var(--border-dashed);
   padding-top: 18px;
@@ -633,6 +747,12 @@ table {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.panel-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .panel-header h2 {
@@ -649,6 +769,33 @@ table {
   background: var(--chip-bg);
   font-size: 0.95rem;
   transition: background 400ms ease, border-color 400ms ease;
+}
+
+.backend-badge {
+  min-width: 0;
+  border-width: 2px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: none;
+}
+
+.backend-badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #9a9a9a;
+}
+
+.backend-badge.online .dot {
+  background: #2e7d32;
+}
+
+.backend-badge.offline .dot {
+  background: #c62828;
 }
 
 .table-wrap,

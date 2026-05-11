@@ -7,11 +7,12 @@ information using meta tag parsing and JSON-LD schema extraction.
 
 import re
 import json
+import time
 import requests
 from bs4 import BeautifulSoup
 
 
-def find_corresponding_author_from_doi(doi, pubmed_authors=None):
+def find_corresponding_author_from_doi(doi, pubmed_authors=None, warning_collector=None):
     """
     Extract corresponding author(s) from an article page via DOI.
 
@@ -26,6 +27,8 @@ def find_corresponding_author_from_doi(doi, pubmed_authors=None):
         doi (str): DOI identifier (e.g., "10.1234/example").
         pubmed_authors (list, optional): List of author names from PubMed to match
             against for name normalization.
+        warning_collector (list, optional): If provided, timeout/network warnings
+            are appended here as strings instead of raising errors.
 
     Returns:
         list or None: List of dicts with 'name' and 'email' keys for corresponding
@@ -49,7 +52,8 @@ def find_corresponding_author_from_doi(doi, pubmed_authors=None):
         - Filters out system emails (e.g., @springernature.com, @rights)
         - Returns first matching email if fallback text search is used
         - Handles both single and multiple corresponding authors
-        - Timeout: 15 seconds per request
+        - Network failures are non-blocking and return None.
+        - Timeout: 15 seconds per request, with limited retries.
     """
     if not doi:
         return None
@@ -59,9 +63,29 @@ def find_corresponding_author_from_doi(doi, pubmed_authors=None):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
+    max_attempts = 3
+    last_error = None
+    resp = None
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            break
+        except requests.RequestException as e:
+            last_error = e
+            if attempt < max_attempts:
+                time.sleep(0.4 * attempt)
+                continue
+
+    if resp is None:
+        warning = f"DOI lookup failed for {doi}: {last_error}"
+        if isinstance(warning_collector, list):
+            warning_collector.append(warning)
+        print(warning)
+        return None
+
     try:
-        resp = requests.get(url, headers=headers, timeout=15)
-        resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Collect ALL author emails from meta tags
@@ -156,5 +180,8 @@ def find_corresponding_author_from_doi(doi, pubmed_authors=None):
         return corresponding_authors if corresponding_authors else None
 
     except Exception as e:
-        print(f"Error processing DOI {doi}: {e}")
+        warning = f"Error processing DOI {doi}: {e}"
+        if isinstance(warning_collector, list):
+            warning_collector.append(warning)
+        print(warning)
         return None
